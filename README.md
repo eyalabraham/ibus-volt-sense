@@ -16,12 +16,12 @@ FlySky-compatible i.BUS voltage sensor implemented in an AVR ATmega328P.
 
 ## Files
 
-ibusvsense.c        Main sesnor module source code
-sensor_type.h       i.bus sensor types
-uart_hduplex_drv.*  Half-duplex serail driver
-ibus_drv.*          Header and source for i.bus serial driver
-util.*              Utility functions
-test/               Some test code in Python
+- ibusvsense.c        Main sesnor module source code
+- sensor_type.h       i.bus sensor types
+- uart_hduplex_drv.*  Half-duplex serail driver
+- ibus_drv.*          Header and source for i.bus serial driver
+- util.*              Utility functions
+- test/               Some test code in Python
 
 ## Resources
 
