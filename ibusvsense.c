@@ -31,7 +31,7 @@
  *     |  |  |  +------------ 'i'
  *     |  |  +--------------- 'i'
  *     |  +------------------ 'i'
- *     +--------------------- 'i' ^Reset (with pull up)
+ *     +--------------------- 'i' ^Reset (external pull up)
  *
  * Port D bit assignment
  *
@@ -64,6 +64,8 @@
 /****************************************************************************
   Definitions
 ****************************************************************************/
+#define     ENABLE_CAPA_SNS     0               // Set to non-zero to enable capacity sensor
+
 #define     LED_OFF             0
 #define     LED_FLASH           1
 #define     LED_ON              2
@@ -72,7 +74,7 @@
 #define     BATT_3S             1
 #define     BATT_4S             2
 
-#define     BATT_SIZES          3
+#define     BATT_SIZES          2
 #define     BATT_PERCENTS       21
 #define     DEF_BATTERY_PERCENT 100
 
@@ -93,29 +95,29 @@ uint16_t    battery_capacity[BATT_PERCENTS][BATT_SIZES] =
 {
 /* Values are fixed point at 0.01v per LSB
  *
- *        2S    3S    4S
+ *         3S    4S
  */
-        { 655,  982, 1309 },    // 0%
-        { 722, 1083, 1443 },    // 5%
-        { 737, 1106, 1475 },    // 10%
-        { 741, 1112, 1483 },    // 15%
-        { 745, 1118, 1491 },    // 20% << discharge danger point
-        { 749, 1124, 1499 },    // 25%
-        { 753, 1130, 1506 },    // 30%
-        { 757, 1136, 1514 },    // 35%
-        { 759, 1139, 1518 },    // 40%
-        { 763, 1145, 1526 },    // 45%
-        { 767, 1151, 1534 },    // 50%
-        { 771, 1156, 1542 },    // 55%
-        { 775, 1162, 1550 },    // 60%
-        { 783, 1174, 1566 },    // 65%
-        { 791, 1186, 1581 },    // 70%
-        { 797, 1195, 1593 },    // 75%
-        { 805, 1207, 1609 },    // 80%
-        { 816, 1225, 1633 },    // 85%
-        { 822, 1233, 1645 },    // 90%
-        { 830, 1245, 1660 },    // 95%
-        { 840, 1260, 1680 },    // 100%
+        {  982, 1309 },    // 0%
+        { 1083, 1443 },    // 5%
+        { 1106, 1475 },    // 10%
+        { 1112, 1483 },    // 15%
+        { 1118, 1491 },    // 20% << discharge danger point
+        { 1124, 1499 },    // 25%
+        { 1130, 1506 },    // 30%
+        { 1136, 1514 },    // 35%
+        { 1139, 1518 },    // 40%
+        { 1145, 1526 },    // 45%
+        { 1151, 1534 },    // 50%
+        { 1156, 1542 },    // 55%
+        { 1162, 1550 },    // 60%
+        { 1174, 1566 },    // 65%
+        { 1186, 1581 },    // 70%
+        { 1195, 1593 },    // 75%
+        { 1207, 1609 },    // 80%
+        { 1225, 1633 },    // 85%
+        { 1233, 1645 },    // 90%
+        { 1245, 1660 },    // 95%
+        { 1260, 1680 },    // 100%
 };
 
 /* ----------------------------------------------------------------------------
@@ -132,7 +134,7 @@ int main(void)
     ibus_packet_t   packet;
 
     int             led_state = LED_OFF;
-    uint16_t        adc_value = 0;
+    uint32_t        adc_value = 0;
 
     /* Initialize IO devices and
      * enable interrupts
@@ -159,8 +161,11 @@ int main(void)
 
             if ( ibus_cmd == IBUS_CMD_DISCOVER )
             {
-                if ( ibus_sensor_id == 1 ||
-                     ibus_sensor_id == 2    )
+                if ( ibus_sensor_id == 1
+#if ( ENABLE_CAPA_SNS )
+                     || ibus_sensor_id == 2
+#endif
+                   )
                 {
                     ibus_send_packet(&packet, 0);
                 }
@@ -179,7 +184,6 @@ int main(void)
                     packet.data[1] = 2;
                     ibus_send_packet(&packet, 2);
                 }
-
             }
             else if ( ibus_cmd == IBUS_CMD_SENSOR_READ )
             {
@@ -191,10 +195,9 @@ int main(void)
                      * maintain accuracy and stay within 16-bits.
                      */
                     adc_value = get_adc();
-                    adc_value *= 193;   // Voltage divider ratio (1/19.3)
+                    adc_value *= 33;    // Zener ADC reference 3.3v
+                    adc_value *= 57;    // Resistor divider 5.7:1
                     adc_value >>= 8;    // ADC readout scaling
-                    adc_value *= 106;   // AVR reference voltage (1.06v)
-                    adc_value /= 10;    // Compensate for 10x value on reference voltage
 
                     packet.data[0] = (uint8_t)(adc_value & 0xff);
                     packet.data[1] = (uint8_t)(adc_value >> 8);
@@ -204,7 +207,7 @@ int main(void)
                 {
                     /* Calculate remaining battery percent
                      */
-                    battery_percent = get_battery_percent(adc_value);
+                    battery_percent = get_battery_percent((uint16_t) adc_value);
 
                     packet.data[0] = battery_percent;
                     packet.data[1] = 0;
@@ -221,7 +224,7 @@ int main(void)
          */
         else if ( ibus_result == IBUS_CHECKSUM_ERR )
         {
-            _delay_us(200);
+            _delay_ms(10);  // wait for at least another packet (>7.5mSec)
             uart_rx_byte();
             led_state = LED_FLASH;
         }
@@ -236,7 +239,6 @@ int main(void)
                 led_state = LED_OFF;
             }
         }
-
 
         /* LED indicator
          */

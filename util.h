@@ -15,7 +15,7 @@
 ****************************************************************************/
 // IO port B initialization
 #define     PB_DDR_INIT     0b00101001  // Port data direction
-#define     PB_PUP_INIT     0b00000010  // Port input pin pull-up in Mac data line
+#define     PB_PUP_INIT     0b00000000  // Port input pin pull-up
 #define     PB_INIT         0b00000001  // Port initial values
 
 #define     STATUS_LED      0b00000001
@@ -24,13 +24,13 @@
 /* IO port C initialization
  */
 #define     PC_DDR_INIT     0b00000000  // Port data direction
-#define     PC_PUP_INIT     0b01000000  // Port input pin pull-up in Mac data line
+#define     PC_PUP_INIT     0b00000000  // Port input pin pull-up
 #define     PC_INIT         0b00000000  // Port initial values
 
 /* IO port D initialization
  */
 #define     PD_DDR_INIT     0b00000010  // Port data direction
-#define     PD_PUP_INIT     0b00000000  // Port input pin pull-up in Mac data line
+#define     PD_PUP_INIT     0b00000000  // Port input pin pull-up
 #define     PD_INIT         0b00000010  // Port initial values
 
 /* Timer0 initialization
@@ -60,7 +60,7 @@
 
 /* ADC converter
  */
-#define     ADMUX_INIT      0b11100000; // Internal 1.1v reference, left adjusted result, ADC0 source
+#define     ADMUX_INIT      0b00100000; // External reference, left adjusted result, ADC0 source
 #define     ADCSRA_INIT     0b11101111; // Auto trigger, Fclk/128
 #define     ADCSRB_INIT     0b00000100; // Timer/Counter0 Overflow trigger source ~38Hz
 #define     DIDR0_INIT      0b00000001; // disable digital input on ADC0
