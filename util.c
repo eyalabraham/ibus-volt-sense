@@ -139,7 +139,7 @@ void status_led_swap(void)
 }
 
 /* ----------------------------------------------------------------------------
- * get_global_time()
+ * get_adc()
  *
  *  Return the value of the last ADC conversion
  *
@@ -200,9 +200,9 @@ ISR(ADC_vect)
 }
 
 /* ----------------------------------------------------------------------------
- * This ISR will trigger approximately every 33mSec when Timer0 overflows.
- * The ISR increments a global 8-bit time variable that will overflow (cycle back through 00)
- * approximately every 8.4 seconds.
+ * This ISR will trigger approximately every 26mSec when Timer0 overflows, @ 10MHz clock.
+ * The ISR increments a global 16-bit time variable that will overflow (cycle back through 0)
+ * approximately every 28.6 minutes.
  *
  */
 ISR(TIMER0_OVF_vect)
