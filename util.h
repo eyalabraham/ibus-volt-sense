@@ -3,6 +3,7 @@
 *
 * Utility functions
 *
+* Modified: June 2024
 * Created: September 2022
 *
 *****************************************************************************/
@@ -58,6 +59,36 @@
 #warning "Device clock not defined"
 #endif
 
+/* Timer1 initialization
+ */
+#define     OCR1AL_INIT     156;        // 1mSec time out.
+#define     TCCR1A_INIT     0b00000000  // Set timer top with OCR1A
+#define     TCCR1B_INIT     0b00001011  // Fosc 1/64
+#define     TCCR1C_INIT     0b00000000
+#define     TIMSK1_INIT     0b00000010
+
+#define     TMR1_DIS        0b11111000  // AND with TCCR1B
+#define     TMR1_ENA        0b00000011  // OR with TCCR1B to enable timer at Fosc 1/64
+
+/* UART BAUD rates
+ */
+#if (F_CPU == 8000000UL)
+#define     UART_BAUD_19200     51  // UBRR0 values for 8MHz clock and U2X0 set
+#define     UART_BAUD_115200    8
+#elif (F_CPU == 10000000UL)
+#define     UART_BAUD_19200     64  // UBRR0 values for 10MHz clock and U2X0 set
+#define     UART_BAUD_115200    10
+#elif (F_CPU == 16000000UL)
+#define     UART_BAUD_19200     103 // UBRR0 values for 16MHz clock and U2X0 set
+#define     UART_BAUD_115200    16
+#else
+#warning "Device clock not defined"
+#endif
+
+#define     BAUD_19200      UART_BAUD_19200
+#define     BAUD_38400      UART_BAUD_38400
+#define     BAUD_115200     UART_BAUD_115200
+
 /* ADC converter
  */
 #define     ADMUX_INIT      0b00100000; // External reference, left adjusted result, ADC0 source
@@ -70,6 +101,8 @@
 ****************************************************************************/
 void     reset(void) __attribute__((naked)) __attribute__((section(".init3")));
 void     ioinit(void);
+void     enable_gap_timer(void);
+void     disable_gap_timer(void);
 void     status_led_on(void);
 void     status_led_off(void);
 void     status_led_swap(void);

@@ -117,7 +117,7 @@ while True:
         if sensor == IBUS_SENSOR_ID:
             send_packet(ser, command, sensor, IBUS_SENSOR_TYPE, IBUS_SENSOR_BYTES)
             
-    elif command == 228IBUS_CMD_SENSOR_READ:
+    elif command == IBUS_CMD_SENSOR_READ:
         print('Read sensor', sensor, '[', checksum_ok, ']')
         if sensor == IBUS_SENSOR_ID:
             send_packet(ser, command, sensor, 228, 2)   # 7.4v

@@ -3,6 +3,7 @@
 *
 * Utility functions
 *
+* Modified: June 2024
 * Created: September 2022
 *
 *****************************************************************************/
@@ -12,7 +13,6 @@
 #include    <avr/wdt.h>
 
 #include    "util.h"
-#include    "uart_hduplex_drv.h"
 
 /****************************************************************************
   Types and definitions
@@ -37,7 +37,6 @@
 /****************************************************************************
   Globals
 ****************************************************************************/
-
 volatile uint16_t   global_counter = 0;     // Global time base
 volatile uint16_t   adc = 0;                // Global ADC last value
 
@@ -84,9 +83,24 @@ void ioinit(void)
     TCCR0B = TCCR0B_INIT;
     TIMSK0 = TIMSK_INIT;
 
-    /* USART
+    /* Timer1, this is the 'gap timer' watchdog
      */
-    uart_initialize(UART_BAUD_115200);
+    TCNT1H = 0;
+    TCNT1L = 0;
+    OCR1AH = 0;
+    OCR1AL = OCR1AL_INIT;
+    TCCR1A = TCCR1A_INIT;
+    TCCR1B = (TCCR1B_INIT & TMR1_DIS);
+    TCCR1C = TCCR1C_INIT;
+    TIMSK1 = TIMSK1_INIT;
+
+    /* Setup the UART
+     */
+    UCSR0A = _BV(U2X0);                 // Double baud rate (sec 19.10 p.195)
+    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00); // 8 data bits, 1 stop, no parity
+    UBRR0 = BAUD_115200;
+
+    UCSR0B = _BV(RXCIE0) | _BV(RXEN0) | _BV(TXEN0);   // enable Tx and Rx
 
     /* ADC
      */
@@ -94,6 +108,36 @@ void ioinit(void)
     ADCSRB = ADCSRB_INIT;
     DIDR0 = DIDR0_INIT;
     ADCSRA = ADCSRA_INIT;
+}
+
+/* ----------------------------------------------------------------------------
+ * enable_gap_timer()
+ *
+ *  Enable the gap timer
+ * 
+ *  param:  none
+ *  return: none
+ *
+ */
+void enable_gap_timer(void)
+{
+    TCNT1H = 0;
+    TCNT1L = 0;
+    TCCR1B |= TMR1_ENA;
+}
+
+/* ----------------------------------------------------------------------------
+ * disable_gap_timer()
+ *
+ *  Disable the gap timer
+ * 
+ *  param:  none
+ *  return: none
+ *
+ */
+void disable_gap_timer(void)
+{
+    TCCR1B &= TMR1_DIS;
 }
 
 /* ----------------------------------------------------------------------------

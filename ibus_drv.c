@@ -1,13 +1,20 @@
 /*****************************************************************************
 * ibus_drv.c
 *
-* Driver source for iBus driver.
+* Source code for iBus driver.
 *
+* AVR UART0 interface connection to
+* a half-duplex device: sensor bus of FlySky RC receiver.
+*
+* Modified: June 2024
 * Created: September 2022
 *
 *****************************************************************************/
 
-#include    "uart_hduplex_drv.h"
+#include    <avr/io.h>
+#include    <avr/interrupt.h>
+
+#include    "util.h"
 #include    "ibus_drv.h"
 
 /****************************************************************************
@@ -22,17 +29,18 @@
 #define     IBUS_BASE_PACKET_SIZE   4
 
 /****************************************************************************
-  Function prototypes
-****************************************************************************/
-
-/****************************************************************************
   Globals
 ****************************************************************************/
 uint8_t     packet_buffer[IBUS_MAX_PACKET_SIZE];
+volatile    int inIndex = 0;
+volatile    int isGap = 0;
 
 /****************************************************************************
   Module functions
 ****************************************************************************/
+static void uart_tx_data(uint8_t *, uint8_t);
+static void uart_rx_on(void);
+static void uart_rx_off(void);
 
 /* ---------------------------------------------------------------------------
  * ibus_get_packet()
@@ -40,42 +48,40 @@ uint8_t     packet_buffer[IBUS_MAX_PACKET_SIZE];
  * Read packet from serial bus and return command and sensor ID
  *
  * Param:  pointer to received command and received sensor ID
- * Return: '-1'=packet ok, '-2'=retry, '0'=bad checksum
+ * Return: '-1'=packet ok, '0'=bad checksum
  *
  */
 int ibus_get_packet(uint8_t *ibus_cmd, uint8_t *ibus_sensor_id)
 {
-    int         packet_length;
     uint16_t    packet_checksum;
-    uint16_t    checksum;
+    uint16_t    checksum = 65535;
 
-    /* Make sure that the buffer is big enough and that there
-     * is at least one packet in the serial input buffer
+    /* Wait for a full 4-byte data packet from the RC receiver.
+     * The gap watch-dog timer will help align packet bytes.
      */
-    if ( uart_isbyte() < IBUS_RCV_PACKET_SIZE )
-        return IBUS_READ_RETRY;
+    inIndex = 0;
 
-    /* Collect a data packet
-     */
-    uart_rx_data(packet_buffer, IBUS_RCV_PACKET_SIZE);
-
-    /* Collect packet command parameters
-     */
-    packet_length = (int)packet_buffer[0];
-    checksum = packet_length;
-
-    *ibus_cmd = (packet_buffer[1] >> 4) & 0x0f;
-    *ibus_sensor_id = packet_buffer[1] & 0x0f;
-    checksum += packet_buffer[1];
-
-    packet_checksum = packet_buffer[2] + (packet_buffer[3] << 8);
+    while ( inIndex < IBUS_RCV_PACKET_SIZE )
+    {
+        /* Do nothing */
+    }
 
     /* Compare checksum against packet
      * fail if not the same
      */
-    checksum = 65535 - checksum;
+    checksum -= packet_buffer[0];
+    checksum -= packet_buffer[1];
+    packet_checksum = packet_buffer[2] + (packet_buffer[3] << 8);
+
     if ( checksum != packet_checksum )
+    {
         return IBUS_CHECKSUM_ERR;
+    }
+
+    /* Collect packet command parameters
+     */
+    *ibus_cmd = (packet_buffer[1] >> 4) & 0x0f;
+    *ibus_sensor_id = packet_buffer[1] & 0x0f;
 
     return IBUS_PACKET_OK;
 }
@@ -120,3 +126,100 @@ void ibus_send_packet(ibus_packet_t *packet, int data_count)
     uart_rx_on();
 }
 
+/* ---------------------------------------------------------------------------
+ * uart_tx_data()
+ *
+ * Write 'byteCount' data bytes to the UART transmitter.
+ * Function blocks until all bytes have been written
+ *
+ * Param:  pointer to data buffer and byte count
+ * Return: none
+ * 
+ */
+static void uart_tx_data(uint8_t *data, uint8_t byteCount)
+{
+    int i;
+
+    for (i = 0; i < byteCount; i++)
+    {
+        loop_until_bit_is_set(UCSR0A, UDRE0);
+        UDR0 = data[i];
+    }
+}
+
+/* ----------------------------------------------------------------------------
+ * uart_rx_on()
+ *
+ *  Enable UART receiver.
+ *
+ * Param:  none
+ * Return: none
+ * 
+ */
+static void uart_rx_on(void)
+{
+    /* Wait for Tx shift register to finish transmitting
+     * and manually clear TXC0 bit because we have no interrupts
+     * on transmit complete.
+     */
+    loop_until_bit_is_set(UCSR0A, TXC0);
+    UCSR0A |= _BV(TXC0);
+
+    /* Now enable the receiver because there
+     * are no more bits on the half duplex line
+     */
+    UCSR0B |= (_BV(RXCIE0) | _BV(RXEN0));
+}
+
+/* ----------------------------------------------------------------------------
+ * uart_rx_off()
+ *
+ *  Disable UART receiver.
+ *
+ * Param:  none
+ * Return: none
+ * 
+ */
+static void uart_rx_off(void)
+{
+    UCSR0B &= ((~_BV(RXCIE0)) & (~_BV(RXEN0)));
+}
+
+/* ----------------------------------------------------------------------------
+ * This ISR will trigger when the UART0 receives a data byte
+ * from the RC Receiver.
+ *
+ */
+ISR(USART_RX_vect)
+{
+    if ( isGap )
+    {
+        /* If 'isGap' is true then this is the first byte  of a packet
+           received from the RC receiver.
+        */
+        isGap = 0;
+        inIndex = 0;
+    }
+
+    if ( inIndex < IBUS_MAX_PACKET_SIZE )
+    {
+        packet_buffer[inIndex] = UDR0;
+        inIndex++;
+    }
+
+    /* Reset the gap watchdog timer
+     */
+    enable_gap_timer();
+}
+
+/* ----------------------------------------------------------------------------
+ * This ISR will trigger when the byte timer expires.
+ * If this timer triggers then no byte has been received for at least one byte-time duration
+ * after the last byte was receive, and a transmission gap is in effect.
+ *
+ */
+ISR(TIMER1_COMPA_vect)
+{
+    isGap = 1;
+    disable_gap_timer();
+}

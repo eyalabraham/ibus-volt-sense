@@ -15,7 +15,7 @@ import serial
 import time
 
 #ser = serial.Serial('/dev/myTTY', baudrate=115200, write_timeout=0.5, timeout=0.5)
-ser = serial.Serial('/dev/ttyUSB0', baudrate=115200, write_timeout=0.5, timeout=0.5)
+ser = serial.Serial('/dev/ttyUSB1', baudrate=115200, write_timeout=0.5, timeout=0.5)
 print(ser.name, ser.baudrate, ser.bytesize, ser.parity, ser.stopbits)
 #ser.write(b'send')
 now = time.time()

@@ -1,7 +1,7 @@
 /*
  * ibusvsense.c
  *
- *  This program runs the FlySky-compatible i.BUS voltage sensor
+ *  This program runs a FlySky-compatible i.BUS voltage sensor
  *  implemented in an AVR ATmega328P.
  *
  * ATmega328P AVR IO
@@ -59,16 +59,11 @@
 #include    "util.h"
 #include    "ibus_drv.h"
 #include    "sensor_type.h"
-#include    "uart_hduplex_drv.h"
 
 /****************************************************************************
   Definitions
 ****************************************************************************/
 #define     ENABLE_CAPA_SNS     0               // Set to non-zero to enable capacity sensor
-
-#define     LED_OFF             0
-#define     LED_FLASH           1
-#define     LED_ON              2
 
 #define     BATT_2S             0
 #define     BATT_3S             1
@@ -78,7 +73,6 @@
 #define     BATT_PERCENTS       21
 #define     DEF_BATTERY_PERCENT 100
 
-#define     NO_PACKET_TIME_OUT  (1*RATE_1HZ)    // 1 second
 #define     STARTUP_DELAY       (2*RATE_1HZ)    // 2 seconds
 
 /****************************************************************************
@@ -126,14 +120,11 @@ uint16_t    battery_capacity[BATT_PERCENTS][BATT_SIZES] =
  */
 int main(void)
 {
-    uint16_t        time_mark;
-    uint16_t        no_packet_time_mark;
     uint8_t         battery_percent;
     int             ibus_result;
     uint8_t         ibus_cmd, ibus_sensor_id;
     ibus_packet_t   packet;
 
-    int             led_state = LED_OFF;
     uint32_t        adc_value = 0;
 
     /* Initialize IO devices and
@@ -142,9 +133,7 @@ int main(void)
     ioinit();
     sei();
 
-    time_mark = get_global_time();
-    no_packet_time_mark = time_mark;
-    startup_time_mark = time_mark;
+    startup_time_mark = get_global_time();
 
     /* Loop forever
      */
@@ -215,44 +204,13 @@ int main(void)
                 }
             }
 
-            led_state = LED_ON;
+            status_led_on();
         }
 
         /* If we get a checksum error, then we are not aligned on
-         * a packet boundary. Do a dummy read and try again until
-         * alignment is reestablished.
-         */
-        else if ( ibus_result == IBUS_CHECKSUM_ERR )
-        {
-            _delay_ms(10);  // wait for at least another packet (>7.5mSec)
-            uart_rx_byte();
-            led_state = LED_FLASH;
-        }
-
-        /* No full data packet available in receiver buffer.
+         * a packet boundary or we have transmission errors.
          */
         else
-        {
-            if ( (uint16_t)(get_global_time() - no_packet_time_mark) >= NO_PACKET_TIME_OUT )
-            {
-                no_packet_time_mark = get_global_time();
-                led_state = LED_OFF;
-            }
-        }
-
-        /* LED indicator
-         */
-        if ( led_state == LED_ON )
-        {
-            status_led_on();
-        }
-        else if ( led_state == LED_FLASH &&
-                (uint16_t)(get_global_time() - time_mark) >= RATE_4HZ )
-        {
-            status_led_swap();
-            time_mark = get_global_time();
-        }
-        else if ( led_state == LED_OFF )
         {
             status_led_off();
         }
